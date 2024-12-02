@@ -1,7 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import './styles/globals.css';  // shadcn/ui base styles
-import './styles/index.css';    // your custom styles
+import './styles/globals.css';    // shadcn/ui base styles
+import './styles/components.css'; // component-specific styles
+import './styles/index.css';      // your custom styles
 import App from './App';
 import { register as registerServiceWorker } from './components/serviceWorker';
 import ErrorBoundary from './components/ErrorBoundary';

@@ -22,16 +22,20 @@ const app = express();
 const port = process.env.PORT || 3001;
 const MAX_FILE_SIZE = process.env.MAX_FILE_SIZE || 100 * 1024 * 1024; // 100MB
 const ALLOWED_FILE_TYPES = ['audio/wav', 'audio/mp3', 'audio/flac', 'audio/aiff'];
+const UPLOAD_DIRECTORY = 'audio-files';
 
 // Rate limiting for file uploads
 const uploadLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100,
   message: { success: false, message: 'Too many upload requests from this IP' }
 });
 
 // Middleware setup
-app.use(cors());
+app.use(cors({
+  origin: 'http://192.168.50.83:3000',
+  credentials: true
+}));
 app.use(morgan('combined'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -147,7 +151,7 @@ class AudioFileProcessor {
     if (!categoryId) return null;
     
     try {
-      const result = await this.pool.query(
+      const result = await client.query(
         'SELECT id, name FROM subcategories WHERE category_id = $1',
         [categoryId]
       );
@@ -205,7 +209,7 @@ class AudioFileProcessor {
         return { isDuplicate: true, filename: file.originalname };
       }
 
-      const filePath = `audio-files/${file.filename}`;
+      const filePath = path.join(UPLOAD_DIRECTORY, file.filename);
       const manufacturerId = await this.detectManufacturer(file.originalname, metadata.path);
       const categoryId = await this.detectCategory(file.originalname);
       const subcategoryId = await this.detectSubcategory(categoryId, file.originalname);
@@ -266,18 +270,13 @@ class AudioFileProcessor {
 }
 
 // Ensure upload directory exists
-if (!fsSync.existsSync('audio-files')) {
-  fsSync.mkdirSync('audio-files', { recursive: true });
+if (!fsSync.existsSync(UPLOAD_DIRECTORY)) {
+  fsSync.mkdirSync(UPLOAD_DIRECTORY, { recursive: true });
 }
-
-// Health check route
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'API is healthy' });
-});
 
 // Multer configuration for file uploads
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'audio-files'),
+  destination: (req, file, cb) => cb(null, UPLOAD_DIRECTORY),
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     const ext = path.extname(file.originalname);
@@ -300,70 +299,6 @@ const upload = multer({
   },
 });
 
-// Download endpoint with CORS headers
-app.get('/api/download/:id', async (req, res, next) => {
-  const client = await pool.connect();
-  try {
-    // Get file information from database
-    const result = await client.query(
-      'SELECT filepath, original_filename, file_type FROM audio_files WHERE id = $1',
-      [req.params.id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'File not found' });
-    }
-
-    const { filepath, original_filename, file_type } = result.rows[0];
-    const absolutePath = path.join(__dirname, filepath);
-
-    // Verify file exists on disk
-    try {
-      await fs.access(absolutePath);
-    } catch (error) {
-      console.error('File not found on disk:', absolutePath);
-      return res.status(404).json({ success: false, message: 'File not found on disk' });
-    }
-
-    // Set CORS headers
-    res.header('Access-Control-Allow-Origin', 'http://192.168.50.83:3000');
-    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.header('Access-Control-Allow-Credentials', 'true');
-
-    // Set download headers
-    res.setHeader('Content-Type', `audio/${file_type}`);
-    res.setHeader('Content-Disposition', `attachment; filename="${original_filename}"`);
-
-    // Stream the file
-    const fileStream = fsSync.createReadStream(absolutePath);
-    fileStream.pipe(res);
-
-    // Handle errors during streaming
-    fileStream.on('error', (error) => {
-      console.error('Error streaming file:', error);
-      if (!res.headersSent) {
-        res.status(500).json({ success: false, message: 'Error streaming file' });
-      }
-    });
-
-  } catch (error) {
-    console.error('Error in download endpoint:', error);
-    next(error);
-  } finally {
-    client.release();
-  }
-});
-
-// Also add OPTIONS handler for the download endpoint
-app.options('/api/download/:id', (req, res) => {
-  res.header('Access-Control-Allow-Origin', 'http://192.168.50.83:3000');
-  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.sendStatus(200);
-});
-
 // Request validation middleware
 const validateUploadRequest = (req, res, next) => {
   if (!req.files?.length) {
@@ -383,18 +318,64 @@ const validateUploadRequest = (req, res, next) => {
 // Initialize audio file processor instance
 const audioProcessor = new AudioFileProcessor(pool);
 
-// Upload endpoint with CORS headers
-app.post('/api/upload',
-  (req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'http://192.168.50.83:3000');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    if (req.method === 'OPTIONS') {
-      return res.sendStatus(200);
+// API Routes
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'API is healthy' });
+});
+
+// Download endpoint
+app.get('/api/download/:id', async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      'SELECT filepath, original_filename, file_type FROM audio_files WHERE id = $1',
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'File not found' });
     }
-    next();
-  },
+
+    const { filepath, original_filename, file_type } = result.rows[0];
+    const absolutePath = path.resolve(__dirname, filepath);
+    
+    console.log('Attempting to download file:', absolutePath);
+
+    try {
+      await fs.access(absolutePath);
+    } catch (error) {
+      console.error('File not found on disk:', absolutePath);
+      return res.status(404).json({ success: false, message: 'File not found on disk' });
+    }
+
+    const stats = await fs.stat(absolutePath);
+    
+    res.setHeader('Content-Type', `audio/${file_type}`);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(original_filename)}"`);
+    res.setHeader('Content-Length', stats.size);
+
+    const fileStream = fsSync.createReadStream(absolutePath);
+    
+    fileStream.on('error', (error) => {
+      console.error('Error streaming file:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, message: 'Error streaming file' });
+      }
+    });
+
+    fileStream.pipe(res);
+  } catch (error) {
+    console.error('Error in download endpoint:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: 'Internal server error during download' });
+    }
+  } finally {
+    client.release();
+  }
+});
+
+// Upload endpoint
+app.post('/api/upload',
   uploadLimiter,
   upload.array('files'),
   validateUploadRequest,
@@ -441,14 +422,15 @@ app.post('/api/upload',
   }
 );
 
-// Error handling middleware with CORS headers
+// Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err);
-  res.header('Access-Control-Allow-Origin', 'http://192.168.50.83:3000');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.status(err.status || 500).json({ success: false, message: err.message });
+  if (!res.headersSent) {
+    res.status(err.status || 500).json({ 
+      success: false, 
+      message: err.message 
+    });
+  }
 });
 
 // Start the server

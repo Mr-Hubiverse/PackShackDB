@@ -1,75 +1,93 @@
 import React, { useState } from 'react';
-import { Download, Loader2, AlertCircle } from 'lucide-react';
+import axios from 'axios';
 
-const DownloadButton = ({ fileId, fileName }) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
+const DownloadButton = ({ fileId, originalFilename }) => {
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const handleDownload = async () => {
-    setIsLoading(true);
-    setError(null);
-
+    setIsDownloading(true);
+    setProgress(0);
+    
     try {
-      // Use the new download endpoint
-      const response = await fetch(`http://192.168.50.82:3001/api/download/${fileId}`);
-      
-      if (!response.ok) {
-        throw new Error(
-          response.status === 404 
-            ? 'File not found' 
-            : `Download failed: ${response.statusText}`
-        );
+      const response = await axios({
+        url: `http://192.168.50.83:3001/api/download/${fileId}`,
+        method: 'GET',
+        responseType: 'blob',
+        withCredentials: true,
+        onDownloadProgress: (progressEvent) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          setProgress(percentCompleted);
+        },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'audio/*'
+        }
+      });
+
+      // Handle error responses that might come as JSON
+      if (response.data.type === 'application/json') {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const error = JSON.parse(reader.result);
+          throw new Error(error.message || 'Download failed');
+        };
+        reader.readAsText(response.data);
+        return;
       }
 
-      // Get filename from Content-Disposition header
-      const disposition = response.headers.get('Content-Disposition');
-      const extractedFileName = disposition?.match(/filename="(.+)"/)?.[1] ?? fileName;
-
-      // Create blob from response
-      const audioFileData = await response.blob();
-      const url = URL.createObjectURL(audioFileData);
-
-      // Trigger download
+      // Create blob URL and trigger download
+      const blob = new Blob([response.data], {
+        type: response.headers['content-type']
+      });
+      
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
+      
+      // Get filename from Content-Disposition header if available
+      const contentDisposition = response.headers['content-disposition'];
+      const downloadFilename = contentDisposition 
+        ? decodeURIComponent(contentDisposition.split('filename="')[1].split('"')[0])
+        : originalFilename || 'download';
+
       link.href = url;
-      link.download = extractedFileName;
+      link.download = downloadFilename;
+      
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Error downloading file:', err);
-      setError('Failed to download the audio file. Please try again.');
+      window.URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error('Download error:', error);
+      alert(error.message || 'Download failed. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsDownloading(false);
+      setProgress(0);
     }
   };
 
   return (
-    <div className="inline-block">
-      {error && (
-        <div className="mb-4 flex items-center gap-2 text-red-500">
-          <AlertCircle className="h-5 w-5" />
-          <span className="text-sm">{error}</span>
+    <div className="download-button-container">
+      <button 
+        onClick={handleDownload}
+        disabled={isDownloading}
+        className={`download-button ${isDownloading ? 'downloading' : ''}`}
+      >
+        {isDownloading 
+          ? `Downloading... ${progress}%` 
+          : 'Download'}
+      </button>
+      {isDownloading && progress > 0 && progress < 100 && (
+        <div className="progress-bar-container">
+          <div 
+            className="progress-bar" 
+            style={{ width: `${progress}%` }}
+          />
         </div>
       )}
-
-      <button
-        onClick={handleDownload}
-        disabled={isLoading}
-        aria-busy={isLoading}
-        aria-label="Download audio file"
-        className="flex items-center gap-2 bg-blue-500 hover:bg-blue-700 text-white font-semibold 
-                   py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 
-                   disabled:cursor-not-allowed shadow-md"
-      >
-        {isLoading ? (
-          <Loader2 className="h-5 w-5 animate-spin" />
-        ) : (
-          <Download className="h-5 w-5" />
-        )}
-        <span>{isLoading ? 'Downloading...' : 'Download Audio'}</span>
-      </button>
     </div>
   );
 };
