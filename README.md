@@ -111,6 +111,8 @@ For detailed API documentation, see the [API Documentation README](https://githu
 
 - ![PackShackDB Architecture](images/architecture.png)
 - ![Sample File Management](images/file_management.png)
+- ![PackShackDB Frontend](https://github.com/Mr-Hubiverse/PackShackDB/blob/main/PackShackDB-Frontend.png)
+- ![PackShackDB pgAdmin](https://github.com/Mr-Hubiverse/PackShackDB/blob/main/PackShackDB-pgAdmin.png)
 
 ## 📋 Development Status
 
