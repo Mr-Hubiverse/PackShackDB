@@ -1,206 +1,183 @@
-# PackShackDB API URL Configuration Guide
+# API_URL Configuration Guide for PackShackDB
 
-[Previous sections remain the same...]
+## Introduction
 
-## CORS Configuration
+This guide provides detailed instructions on setting up Cross-Origin Resource Sharing (CORS), configuring Nginx, and configuring the API URL for the PackShackDB program. Following these steps will ensure your application can communicate securely and efficiently with the PackShackDB API.
 
-### Direct CORS Setup (Backend)
-```javascript
-// backend/server.js
-const cors = require('cors');
+## Table of Contents
 
-// Basic CORS setup
-app.use(cors({
-  origin: 'http://192.168.50.83:3000',       // Frontend URL
-  credentials: true,                         // Allow credentials
-  methods: ['GET', 'POST', 'OPTIONS'],       // Allowed methods
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+1. [Prerequisites](#prerequisites)
+2. [Setting Up CORS](#setting-up-cors)
+3. [Configuring Nginx](#configuring-nginx)
+4. [Setting the API URL for PackShackDB](#setting-the-api-url-for-packshackdb)
+5. [Testing the Configuration](#testing-the-configuration)
+6. [Troubleshooting](#troubleshooting)
+7. [Conclusion](#conclusion)
 
-// Multiple origins setup
-const allowedOrigins = [
-  'http://192.168.50.83:3000',
-  'http://localhost:3000',
-  'https://your-production-domain.com'
-];
+## Prerequisites
 
-app.use(cors({
-  origin: function(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true
-}));
-```
+1. **Server Access**: Ensure you have administrative access to your server.
+2. **Nginx Installed**: Confirm that Nginx is installed on your server.
+3. **PackShackDB Installed**: The PackShackDB application should be properly installed.
 
-### CORS Headers for Specific Routes
-```javascript
-app.get('/api/download/:id', async (req, res) => {
-  res.header('Access-Control-Allow-Origin', 'http://192.168.50.83:3000');
-  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  
-  // Rest of your download logic...
-});
-```
+## Setting Up CORS
 
-## Reverse Proxy Configuration
+CORS is a security feature that allows controlled access to resources located outside of a given domain.
 
-### NGINX Reverse Proxy
-```nginx
-# /etc/nginx/conf.d/packshack.conf
+### Server-Side Configuration
 
-# Frontend proxy
-server {
-    listen 80;
-    server_name your-domain.com;
+1. **Install CORS Middleware (if necessary)**
+   - For Node.js applications using Express:
+     ```
+     npm install cors
+     ```
+2. **Enable CORS in Your Application**
+   - In your main server file (e.g., `app.js`), add:
+     ```javascript
+     const express = require('express');
+     const cors = require('cors');
+     const app = express();
 
-    location / {
-        proxy_pass http://192.168.50.83:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
+     app.use(cors());
 
-# Backend API proxy
-server {
-    listen 80;
-    server_name api.your-domain.com;
+     // Rest of your server code
+     ```
+3. **Customize CORS Options (Optional)**
+   - You can specify allowed origins and methods:
+     ```javascript
+     app.use(cors({
+       origin: 'https://your-allowed-origin.com',
+       methods: ['GET', 'POST']
+     }));
+     ```
 
-    # Handle CORS preflight requests
-    location / {
-        if ($request_method = 'OPTIONS') {
-            add_header 'Access-Control-Allow-Origin' 'http://your-domain.com';
-            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
-            add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization';
-            add_header 'Access-Control-Max-Age' 86400;
-            return 204;
-        }
+### Nginx Configuration for CORS
 
-        proxy_pass http://192.168.50.82:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        
-        # CORS headers
-        add_header 'Access-Control-Allow-Origin' 'http://your-domain.com';
-        add_header 'Access-Control-Allow-Credentials' 'true';
-    }
+1. **Edit Nginx Configuration File**
+   ```
+   sudo nano /etc/nginx/sites-available/default
+   ```
+2. **Add CORS Headers**
+   - Inside the server block, add:
+     ```nginx
+     location / {
+         add_header 'Access-Control-Allow-Origin' '*';
+         add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
+         add_header 'Access-Control-Allow-Headers' 'Origin, Content-Type, Accept, Authorization';
+         
+         if ($request_method = 'OPTIONS') {
+             return 204;
+         }
+         
+         # Proxy settings
+         proxy_pass http://localhost:3000;
+         proxy_http_version 1.1;
+         proxy_set_header Upgrade $http_upgrade;
+         proxy_set_header Connection 'upgrade';
+         proxy_set_header Host $host;
+         proxy_cache_bypass $http_upgrade;
+     }
+     ```
+     - Replace `http://localhost:3000` with your application's URL and port.
+3. **Save and Exit**
+   - Press `CTRL + X`, then `Y`, and `Enter` to save.
+4. **Test Nginx Configuration**
+   ```
+   sudo nginx -t
+   ```
+5. **Restart Nginx**
+   ```
+   sudo systemctl restart nginx
+   ```
 
-    # Large file uploads configuration
-    client_max_body_size 100M;
-    proxy_read_timeout 300;
-    proxy_connect_timeout 300;
-    proxy_send_timeout 300;
-}
-```
+## Configuring Nginx
 
-### Docker Compose with NGINX
-```yaml
-version: '3.8'
+Proper Nginx configuration ensures efficient request handling and can improve security.
 
-services:
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d
-      - ./nginx/ssl:/etc/nginx/ssl
-    depends_on:
-      - frontend
-      - backend
-    networks:
-      - app_network
+1. **Open Nginx Configuration File**
+   ```
+   sudo nano /etc/nginx/sites-available/default
+   ```
+2. **Configure Server Block**
+   - Update your server block as follows:
+     ```nginx
+     server {
+         listen 80;
+         server_name yourdomain.com www.yourdomain.com;
 
-  frontend:
-    environment:
-      - REACT_APP_API_URL=https://api.your-domain.com
-    networks:
-      - app_network
+         location / {
+             proxy_pass http://localhost:3000;
+             proxy_http_version 1.1;
+             proxy_set_header Upgrade $http_upgrade;
+             proxy_set_header Connection 'upgrade';
+             proxy_set_header Host $host;
+             proxy_cache_bypass $http_upgrade;
+         }
 
-  backend:
-    networks:
-      - app_network
+         # Other configurations...
+     }
+     ```
+     - Replace `yourdomain.com` with your actual domain and adjust the proxy settings as needed.
+3. **Enable Site Configuration**
+   - If you created a new config file:
+     ```
+     sudo ln -s /etc/nginx/sites-available/yourconfig /etc/nginx/sites-enabled/
+     ```
+4. **Test and Restart Nginx**
+   ```
+   sudo nginx -t
+   sudo systemctl restart nginx
+   ```
 
-networks:
-  app_network:
-    driver: bridge
-```
+## Setting the API URL for PackShackDB
 
-## API URL Configuration with Reverse Proxy
+The API URL is crucial for your application to communicate with the PackShackDB API.
 
-### Development
-```javascript
-// frontend/.env.development
-REACT_APP_API_URL=http://localhost:3001/api
+1. **Locate Configuration File**
+   - Find where the API URL is set, such as in a `.env` file or a configuration file.
+2. **Set the API URL**
+   - In your `.env` file:
+     ```
+     API_URL=https://yourdomain.com/api
+     ```
+   - Or in your configuration file:
+     ```javascript
+     const API_URL = 'https://yourdomain.com/api';
+     ```
+3. **Update Application Code**
+   - Ensure your application uses this API URL variable when making API requests.
+4. **Restart Application**
+   - Apply changes by restarting your application:
+     - For PM2-managed applications:
+       ```
+       pm2 restart your-app-name
+       ```
 
-// Alternative with nginx
-REACT_APP_API_URL=http://api.localhost/api
-```
+## Testing the Configuration
 
-### Production
-```javascript
-// frontend/.env.production
-REACT_APP_API_URL=https://api.your-domain.com/api
-```
+1. **Check CORS Headers**
+   - Use cURL to verify CORS headers:
+     ```
+     curl -I https://yourdomain.com
+     ```
+   - Look for `Access-Control-Allow-Origin` in the response headers.
+2. **Test API Requests**
+   - From a client application or using tools like Postman, send a request to the API endpoint to ensure it's working.
+3. **Browser Testing**
+   - Access your application in a browser and check the console for any CORS-related errors.
 
-## Common Reverse Proxy Issues and Solutions
+## Troubleshooting
 
-### 1. WebSocket Connection Issues
-Add these headers in your NGINX configuration:
-```nginx
-proxy_set_header Upgrade $http_upgrade;
-proxy_set_header Connection "upgrade";
-proxy_http_version 1.1;
-```
+1. **CORS Errors Persist**
+   - Double-check the allowed origins in your CORS configuration.
+   - Ensure there are no typos in your Nginx or server configuration files.
+2. **Nginx Fails to Restart**
+   - Run `sudo nginx -t` to identify syntax errors.
+   - Check for conflicting server blocks or ports.
+3. **Environment Variables Not Loaded**
+   - Confirm that the `.env` file is properly formatted.
+   - Restart your application to load new environment variables.
 
-### 2. File Upload Issues
-Adjust NGINX body size limits:
-```nginx
-client_max_body_size 100M;
-```
+## Conclusion
 
-### 3. Timeouts
-Configure appropriate timeouts for large operations:
-```nginx
-proxy_connect_timeout 300;
-proxy_send_timeout 300;
-proxy_read_timeout 300;
-send_timeout 300;
-```
-
-### 4. SSL/HTTPS Configuration
-```nginx
-server {
-    listen 443 ssl;
-    server_name api.your-domain.com;
-
-    ssl_certificate /etc/nginx/ssl/your-cert.pem;
-    ssl_certificate_key /etc/nginx/ssl/your-key.pem;
-    
-    # Modern SSL configuration
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
-
-    # Rest of your configuration...
-}
-```
-
-Remember to:
-1. Always test CORS configuration in development
-2. Use secure HTTPS in production
-3. Configure appropriate timeouts for your use case
-4. Monitor proxy logs for issues
-5. Implement proper error handling in both frontend and backend
-
+By following this guide, you have successfully set up CORS, configured Nginx, and set the API URL for the PackShackDB program. Your application should now be able to interact with the PackShackDB API seamlessly.
