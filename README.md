@@ -103,9 +103,7 @@ For detailed API documentation, see the [API Documentation README](https://githu
 
 ## 📄 Related Files
 
-- [Frontend README](frontend/README.md)
-- [Backend README](backend/README.md)
-- [Docker Setup](docker/README.md)
+- [Docker Setup](https://github.com/Mr-Hubiverse/PackShackDB/blob/main/PackShackDB-Docker-Setup.mb)
 
 ## 🖼️ Images
 
