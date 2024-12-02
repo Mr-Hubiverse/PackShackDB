@@ -81,7 +81,7 @@ The API provides endpoints for:
 - Category and tag management
 - Health monitoring
 
-For detailed API documentation, see the [API Documentation README](https://github.com/Mr-Hubiverse/PackShackDB/blob/main/API_URL%20%26%20Other-Details.md).
+For detailed API documentation, see the [API Documentation README](https://github.com/Mr-Hubiverse/PackShackDB/blob/main/API_URL-Details.md).
 
 ## 📄 Related Files
 - [Docker Setup](https://github.com/Mr-Hubiverse/PackShackDB/blob/main/PackShackDB-Docker-Setup.md)
