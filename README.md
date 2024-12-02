@@ -1,3 +1,4 @@
+
 # PackShackDB
 
 PackShackDB is a media management backend designed to handle audio files, metadata, and related data such as sample packs, manufacturers, and categories. It supports file uploads, metadata extraction, and offers an API for managing and querying audio files.
@@ -48,9 +49,9 @@ The project uses Docker Compose for containerization. You'll need to:
      - Creating a bridge network (simpler deployment)
 
 2. Update API endpoints in:
-   - Frontend: `PackshackDB/frontend/src/App.js`
-   - Upload component: `PackshackDB/frontend/src/components/AudioFileUploader.js`
-   - Backend: `PackshackDB/backend/server.js`
+   - Frontend: [`frontend/src/App.js`](frontend/src/App.js)
+   - Upload component: [`frontend/src/components/AudioFileUploader.js`](frontend/src/components/AudioFileUploader.js)
+   - Backend: [`backend/server.js`](backend/server.js)
 
 ### 3. Build and Deploy
 
@@ -99,6 +100,17 @@ The API provides endpoints for:
 - Health monitoring
 
 Detailed API documentation coming soon.
+
+## 📄 Related Files
+
+- [Frontend README](frontend/README.md)
+- [Backend README](backend/README.md)
+- [Docker Setup](docker/README.md)
+
+## 🖼️ Images
+
+- ![PackShackDB Architecture](images/architecture.png)
+- ![Sample File Management](images/file_management.png)
 
 ## 🤝 Contributing
 
