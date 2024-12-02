@@ -99,7 +99,7 @@ The API provides endpoints for:
 - Category and tag management
 - Health monitoring
 
-Detailed API documentation coming soon.
+For detailed API documentation, see the [API Documentation README](https://github.com/Mr-Hubiverse/PackShackDB/blob/main/API_URL%20%26%20Other-Details.md).
 
 ## 📄 Related Files
 
@@ -111,6 +111,10 @@ Detailed API documentation coming soon.
 
 - ![PackShackDB Architecture](images/architecture.png)
 - ![Sample File Management](images/file_management.png)
+
+## 📋 Development Status
+
+For information about the current development status of PackShackDB, see the [Development Status README](https://github.com/Mr-Hubiverse/PackShackDB/blob/main/PackShackDB-Development-Status.md).
 
 ## 🤝 Contributing
 
