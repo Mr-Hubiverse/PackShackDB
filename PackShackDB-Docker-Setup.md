@@ -202,4 +202,4 @@ This command stops the containers and removes the networks created by Docker Com
 
 - Docker Documentation: [https://docs.docker.com/](https://docs.docker.com/)
 - Docker Compose Documentation: [https://docs.docker.com/compose/](https://docs.docker.com/compose/)
-- Docker Cheat Sheet: [Docker Cheat Sheet](https://www.docker.com/sites/default/files/d8/2019-09/docker-cheat-sheet.pdf)
+- Docker Cheat Sheet: [Docker Cheat Sheet](https://docs.docker.com/get-started/docker_cheatsheet.pdf)
